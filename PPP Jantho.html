@@ -1,0 +1,1089 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Presensi Petugas Posbakum - Pengadilan Negeri Jantho</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            box-sizing: border-box;
+        }
+        .gradient-bg {
+            background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 50%, #06b6d4 100%);
+        }
+        .card-shadow {
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .fade-in {
+            animation: fadeIn 0.5s ease-out;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        .pulse-animation {
+            animation: pulse 2s infinite;
+        }
+        .clock-display {
+            font-family: 'Courier New', monospace;
+            font-size: 2rem;
+            font-weight: bold;
+        }
+        .status-hadir { background-color: #10b981; }
+        .status-izin { background-color: #f59e0b; }
+        .status-alpa { background-color: #ef4444; }
+        .status-sakit { background-color: #8b5cf6; }
+        .status-dispen { background-color: #06b6d4; }
+        .debug-panel {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            max-width: 300px;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body class="min-h-full bg-gray-50">
+    <!-- Debug Panel -->
+    <div id="debugPanel" class="debug-panel hidden">
+        <div><strong>Debug Info:</strong></div>
+        <div id="debugContent"></div>
+        <button onclick="toggleDebug()" class="mt-2 bg-red-500 text-white px-2 py-1 rounded text-xs">Hide Debug</button>
+    </div>
+
+    <!-- Login Page -->
+    <div id="loginPage" class="min-h-full gradient-bg flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl card-shadow p-8 w-full max-w-md fade-in">
+            <div class="text-center mb-8">
+                <img src="https://www.pn-jantho.go.id/wp-content/uploads/2024/11/LOGO-HIJAU-2-LINGKARAN-PN-JANTHO-1.png" 
+                     alt="Logo PN Jantho" class="w-20 h-20 mx-auto mb-4"
+                     onerror="this.src=''; this.alt='Logo PN Jantho'; this.style.display='none';">
+                <h1 class="text-2xl font-bold text-gray-800 mb-2">Presensi Petugas Posbakum</h1>
+                <p class="text-gray-600">Pengadilan Negeri Jantho</p>
+            </div>
+            
+            <form id="loginForm" class="space-y-6">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">NIP</label>
+                    <select id="nipSelect" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="">Pilih NIP Anda</option>
+                        <option value="081360676161">081360676161 - Abdussalam Abdul Jalil, S.Hi</option>
+                        <option value="081377061409">081377061409 - Yusrizal S.H.</option>
+                        <option value="081269066679">081269066679 - Taufik Hidayat, S.H. M.H</option>
+                    </select>
+                </div>
+                
+                <button type="submit" class="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition duration-200 font-medium">
+                    Masuk
+                </button>
+            </form>
+            
+            <div id="loginError" class="mt-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg hidden">
+                Silakan pilih NIP Anda!
+            </div>
+
+            <!-- Admin Login Link -->
+            <div class="mt-4 p-3 bg-yellow-100 border border-yellow-400 text-yellow-800 rounded-lg">
+                <p class="text-sm text-center"><strong>Untuk Admin:</strong></p>
+                <p class="text-xs text-center">Klik tombol di bawah untuk membuka admin panel</p>
+                <div class="text-center mt-2">
+                    <button onclick="showAdminPanel()" class="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700">
+                        Buka Admin Panel
+                    </button>
+                </div>
+            </div>
+
+            <!-- Debug Button -->
+            <div class="mt-4 text-center">
+                <button onclick="toggleDebug()" class="text-xs text-gray-500 hover:text-gray-700">Show Debug Info</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Application -->
+    <div id="mainApp" class="hidden min-h-full">
+        <!-- Header -->
+        <header class="bg-white shadow-lg">
+            <div class="max-w-4xl mx-auto px-4 py-4">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-4">
+                        <img src="https://www.pn-jantho.go.id/wp-content/uploads/2024/11/LOGO-HIJAU-2-LINGKARAN-PN-JANTHO-1.png" 
+                             alt="Logo PN Jantho" class="w-12 h-12"
+                             onerror="this.src=''; this.alt='Logo PN Jantho'; this.style.display='none';">
+                        <div>
+                            <h1 class="text-xl font-bold text-gray-800">Pengadilan Negeri Jantho</h1>
+                            <p class="text-sm text-gray-600">Sistem Presensi Petugas Posbakum</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <span class="text-sm text-gray-600" id="userInfo"></span>
+                        <button onclick="logout()" class="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition duration-200">
+                            Keluar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <div class="max-w-4xl mx-auto p-6">
+            <!-- Clock and Date -->
+            <div class="bg-white rounded-xl card-shadow p-6 mb-6 fade-in text-center">
+                <div class="clock-display text-blue-600 mb-2" id="currentTime"></div>
+                <div class="text-lg text-gray-600" id="currentDate"></div>
+            </div>
+
+            <!-- Profile Card -->
+            <div class="bg-white rounded-xl card-shadow p-6 mb-6 fade-in">
+                <h2 class="text-xl font-bold text-gray-800 mb-4">Profil Petugas Posbakum</h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4" id="profileInfo">
+                    <!-- Profile info will be populated here -->
+                </div>
+            </div>
+
+            <!-- Integration Status -->
+            <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
+                <div class="flex items-center">
+                    <svg class="w-5 h-5 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <div>
+                        <p class="text-sm text-blue-800"><strong>Status Integrasi:</strong> <span id="integrationStatus">Terhubung dengan sistem admin</span></p>
+                        <p class="text-xs text-blue-600">Data absensi Anda akan otomatis tersimpan dan dapat dilihat oleh admin</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Absensi Actions -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <!-- Check In -->
+                <div class="bg-white rounded-xl card-shadow p-6 fade-in">
+                    <div class="text-center">
+                        <div class="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <svg class="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"></path>
+                            </svg>
+                        </div>
+                        <h3 class="text-lg font-semibold text-gray-800 mb-2">Check In</h3>
+                        <p class="text-gray-600 mb-4">Catat waktu kedatangan Anda</p>
+                        <button id="checkinBtn" onclick="checkIn()" class="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition duration-200 font-medium pulse-animation">
+                            Check In Sekarang
+                        </button>
+                        <div id="checkinTime" class="mt-2 text-sm text-green-600 font-medium hidden"></div>
+                    </div>
+                </div>
+
+                <!-- Check Out -->
+                <div class="bg-white rounded-xl card-shadow p-6 fade-in">
+                    <div class="text-center">
+                        <div class="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <svg class="w-10 h-10 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                            </svg>
+                        </div>
+                        <h3 class="text-lg font-semibold text-gray-800 mb-2">Check Out</h3>
+                        <p class="text-gray-600 mb-4">Catat waktu pulang Anda</p>
+                        <button id="checkoutBtn" onclick="checkOut()" disabled class="w-full bg-gray-400 text-white py-3 rounded-lg transition duration-200 font-medium cursor-not-allowed">
+                            Check Out
+                        </button>
+                        <div id="checkoutTime" class="mt-2 text-sm text-red-600 font-medium hidden"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Status Kehadiran -->
+            <div class="bg-white rounded-xl card-shadow p-6 mb-6 fade-in">
+                <h2 class="text-xl font-bold text-gray-800 mb-4">Status Kehadiran Hari Ini</h2>
+                <div id="statusKehadiran" class="text-center py-8">
+                    <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <p class="text-gray-500">Belum melakukan absensi hari ini</p>
+                </div>
+            </div>
+
+            <!-- Riwayat Absensi -->
+            <div class="bg-white rounded-xl card-shadow p-6 fade-in">
+                <h2 class="text-xl font-bold text-gray-800 mb-4">Riwayat Absensi (7 Hari Terakhir)</h2>
+                <div class="overflow-x-auto">
+                    <table class="w-full border-collapse border border-gray-300">
+                        <thead>
+                            <tr class="bg-gray-100">
+                                <th class="border border-gray-300 px-4 py-2 text-left">Tanggal</th>
+                                <th class="border border-gray-300 px-4 py-2 text-left">Status</th>
+                                <th class="border border-gray-300 px-4 py-2 text-left">Check In</th>
+                                <th class="border border-gray-300 px-4 py-2 text-left">Check Out</th>
+                                <th class="border border-gray-300 px-4 py-2 text-left">Durasi Kerja</th>
+                            </tr>
+                        </thead>
+                        <tbody id="riwayatTable">
+                            <!-- Data will be populated here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="bg-gray-800 text-white mt-12">
+            <div class="max-w-4xl mx-auto px-4 py-8">
+                <div class="flex items-center justify-center">
+                    <img src="https://www.pn-jantho.go.id/wp-content/uploads/2024/05/cropped-cropped-header.png" 
+                         alt="Footer Logo" class="h-12"
+                         onerror="this.src=''; this.alt='Footer Logo'; this.style.display='none';">
+                </div>
+                <div class="text-center mt-4">
+                    <p class="text-sm text-gray-400">© 2024 Pengadilan Negeri Jantho. Sistem Presensi Petugas Posbakum.</p>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Admin Panel -->
+    <div id="adminPanel" class="hidden min-h-full">
+        <!-- Admin Login -->
+        <div id="adminLoginPage" class="min-h-full gradient-bg flex items-center justify-center p-4">
+            <div class="bg-white rounded-2xl card-shadow p-8 w-full max-w-md fade-in">
+                <div class="text-center mb-8">
+                    <h1 class="text-2xl font-bold text-gray-800 mb-2">Admin Panel</h1>
+                    <p class="text-gray-600">Pengadilan Negeri Jantho</p>
+                </div>
+                <form id="adminLoginForm" class="space-y-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Username</label>
+                        <input type="text" id="adminUsername" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Masukkan username" value="admin">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                        <input type="password" id="adminPassword" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Masukkan password" value="user">
+                    </div>
+                    <button type="submit" class="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition duration-200 font-medium">
+                        Masuk Admin
+                    </button>
+                </form>
+                <div id="adminLoginError" class="mt-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg hidden">
+                    Username atau password salah!
+                </div>
+                <div class="mt-4 p-3 bg-blue-100 border border-blue-400 text-blue-700 rounded-lg">
+                    <p class="text-sm"><strong>Demo Credentials:</strong></p>
+                    <p class="text-sm">Username: admin | Password: user</p>
+                </div>
+                <div class="mt-4 text-center">
+                    <button onclick="backToEmployee()" class="text-sm text-gray-500 hover:text-gray-700">
+                        ← Kembali ke Halaman Pegawai
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Admin Dashboard -->
+        <div id="adminDashboard" class="hidden min-h-full">
+            <header class="bg-white shadow-lg">
+                <div class="max-w-7xl mx-auto px-4 py-4">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-4">
+                            <img src="https://www.pn-jantho.go.id/wp-content/uploads/2024/11/LOGO-HIJAU-2-LINGKARAN-PN-JANTHO-1.png" 
+                                 alt="Logo PN Jantho" class="w-12 h-12"
+                                 onerror="this.src=''; this.alt='Logo PN Jantho'; this.style.display='none';">
+                            <div>
+                                <h1 class="text-xl font-bold text-gray-800">Admin Panel - Pengadilan Negeri Jantho</h1>
+                                <p class="text-sm text-gray-600">Sistem Presensi Petugas Posbakum</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-4">
+                            <span class="text-sm text-gray-600">Admin</span>
+                            <button onclick="logoutAdmin()" class="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition duration-200">
+                                Keluar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Navigation -->
+            <nav class="bg-blue-600 text-white">
+                <div class="max-w-7xl mx-auto px-4">
+                    <div class="flex space-x-8">
+                        <button onclick="showAdminPage('dashboard')" id="navAdminDashboard" class="py-4 px-6 border-b-2 border-white transition duration-200">
+                            Dashboard
+                        </button>
+                        <button onclick="showAdminPage('rekap')" id="navAdminRekap" class="py-4 px-6 border-b-2 border-transparent hover:border-white transition duration-200">
+                            Rekap Kehadiran
+                        </button>
+                    </div>
+                </div>
+            </nav>
+
+            <!-- Dashboard Content -->
+            <div id="adminDashboardContent" class="max-w-7xl mx-auto p-6">
+                <!-- Stats Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                    <div class="bg-white rounded-xl card-shadow p-6 fade-in">
+                        <div class="flex items-center">
+                            <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                                <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                            </div>
+                            <div class="ml-4">
+                                <p class="text-sm text-gray-600">Hadir Hari Ini</p>
+                                <p class="text-2xl font-bold text-gray-800" id="adminHadirCount">0</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-xl card-shadow p-6 fade-in">
+                        <div class="flex items-center">
+                            <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                                <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                                </svg>
+                            </div>
+                            <div class="ml-4">
+                                <p class="text-sm text-gray-600">Total Petugas</p>
+                                <p class="text-2xl font-bold text-gray-800">3</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-xl card-shadow p-6 fade-in">
+                        <div class="flex items-center">
+                            <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                                <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                                </svg>
+                            </div>
+                            <div class="ml-4">
+                                <p class="text-sm text-gray-600">Self Service</p>
+                                <p class="text-2xl font-bold text-gray-800" id="adminSelfServiceCount">0</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Today's Data Table -->
+                <div class="bg-white rounded-xl card-shadow p-6 mb-6 fade-in">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-bold text-gray-800">Data Absensi Hari Ini</h2>
+                        <div class="flex space-x-2">
+                            <span class="px-2 py-1 bg-green-500 text-white text-xs rounded">Self Service</span>
+                            <span class="px-2 py-1 bg-blue-500 text-white text-xs rounded">Admin Input</span>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full border-collapse border border-gray-300">
+                            <thead>
+                                <tr class="bg-gray-100">
+                                    <th class="border border-gray-300 px-4 py-2 text-left">NIP</th>
+                                    <th class="border border-gray-300 px-4 py-2 text-left">Nama</th>
+                                    <th class="border border-gray-300 px-4 py-2 text-left">Status</th>
+                                    <th class="border border-gray-300 px-4 py-2 text-left">Check In</th>
+                                    <th class="border border-gray-300 px-4 py-2 text-left">Check Out</th>
+                                    <th class="border border-gray-300 px-4 py-2 text-left">Sumber</th>
+                                    <th class="border border-gray-300 px-4 py-2 text-left">Waktu Update</th>
+                                </tr>
+                            </thead>
+                            <tbody id="adminTodayTable">
+                                <!-- Data will be populated here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Rekap Content -->
+            <div id="adminRekapContent" class="max-w-7xl mx-auto p-6 hidden">
+                <div class="bg-white rounded-xl card-shadow p-6 fade-in">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-xl font-bold text-gray-800">Rekap Kehadiran Lengkap</h2>
+                        <button onclick="cetakPDF()" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition duration-200">
+                            📄 Cetak PDF
+                        </button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full border-collapse border border-gray-300">
+                            <thead>
+                                <tr class="bg-gray-100">
+                                    <th class="border border-gray-300 px-4 py-2 text-left">Tanggal</th>
+                                    <th class="border border-gray-300 px-4 py-2 text-left">NIP</th>
+                                    <th class="border border-gray-300 px-4 py-2 text-left">Nama</th>
+                                    <th class="border border-gray-300 px-4 py-2 text-left">Jabatan</th>
+                                    <th class="border border-gray-300 px-4 py-2 text-left">Status</th>
+                                    <th class="border border-gray-300 px-4 py-2 text-left">Check In</th>
+                                    <th class="border border-gray-300 px-4 py-2 text-left">Check Out</th>
+                                    <th class="border border-gray-300 px-4 py-2 text-left">Sumber</th>
+                                </tr>
+                            </thead>
+                            <tbody id="adminRekapTable">
+                                <!-- Data will be populated here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Success Modal -->
+    <div id="successModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-xl p-6 max-w-md w-full mx-4">
+            <div class="text-center">
+                <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                </div>
+                <h3 class="text-lg font-semibold text-gray-800 mb-2" id="modalTitle">Berhasil!</h3>
+                <p class="text-gray-600 mb-4" id="modalMessage">Absensi berhasil dicatat.</p>
+                <button onclick="closeModal()" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition duration-200">
+                    OK
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Data pegawai
+        const pegawaiData = {
+            "081360676161": { nama: "Abdussalam Abdul Jalil, S.Hi", jabatan: "Pegawai" },
+            "081377061409": { nama: "Yusrizal S.H.", jabatan: "Pegawai" },
+            "081269066679": { nama: "Taufik Hidayat, S.H. M.H", jabatan: "Pegawai" }
+        };
+
+        let currentUser = null;
+        let todayAttendance = null;
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            updateClock();
+            setInterval(updateClock, 1000);
+            updateDebugInfo();
+        });
+
+        // Debug functions
+        function toggleDebug() {
+            const panel = document.getElementById('debugPanel');
+            panel.classList.toggle('hidden');
+            updateDebugInfo();
+        }
+
+        function updateDebugInfo() {
+            const debugContent = document.getElementById('debugContent');
+            if (!debugContent) return;
+            
+            const absenData = JSON.parse(localStorage.getItem('absenData') || '[]');
+            const today = new Date().toISOString().split('T')[0];
+            const todayData = absenData.filter(item => item.tanggal === today);
+            const selfServiceData = todayData.filter(item => item.submittedBy === 'Self Service');
+            
+            debugContent.innerHTML = `
+                <div>Total records: ${absenData.length}</div>
+                <div>Today's records: ${todayData.length}</div>
+                <div>Self Service today: ${selfServiceData.length}</div>
+                <div>Current user: ${currentUser ? currentUser.nama : 'None'}</div>
+                <div>Storage key: absenData</div>
+                <div>Last update: ${new Date().toLocaleTimeString()}</div>
+            `;
+        }
+
+        // Clock function
+        function updateClock() {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('id-ID', { 
+                hour12: false,
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+            const dateString = now.toLocaleDateString('id-ID', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+            
+            const timeElement = document.getElementById('currentTime');
+            const dateElement = document.getElementById('currentDate');
+            if (timeElement) timeElement.textContent = timeString;
+            if (dateElement) dateElement.textContent = dateString;
+        }
+
+        // Login functionality
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const selectedNip = document.getElementById('nipSelect').value;
+            
+            if (!selectedNip) {
+                document.getElementById('loginError').classList.remove('hidden');
+                return;
+            }
+            
+            currentUser = {
+                nip: selectedNip,
+                ...pegawaiData[selectedNip]
+            };
+            
+            document.getElementById('loginPage').classList.add('hidden');
+            document.getElementById('mainApp').classList.remove('hidden');
+            
+            loadUserProfile();
+            loadTodayAttendance();
+            loadAttendanceHistory();
+            updateDebugInfo();
+        });
+
+        function logout() {
+            currentUser = null;
+            todayAttendance = null;
+            document.getElementById('mainApp').classList.add('hidden');
+            document.getElementById('loginPage').classList.remove('hidden');
+            document.getElementById('nipSelect').value = '';
+            document.getElementById('loginError').classList.add('hidden');
+        }
+
+        // Load user profile
+        function loadUserProfile() {
+            document.getElementById('userInfo').textContent = currentUser.nama;
+            
+            const profileInfo = document.getElementById('profileInfo');
+            profileInfo.innerHTML = `
+                <div class="text-center">
+                    <div class="text-sm text-gray-500">NIP</div>
+                    <div class="font-semibold text-gray-800">${currentUser.nip}</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-sm text-gray-500">Nama</div>
+                    <div class="font-semibold text-gray-800">${currentUser.nama}</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-sm text-gray-500">Jabatan</div>
+                    <div class="font-semibold text-gray-800">${currentUser.jabatan}</div>
+                </div>
+            `;
+        }
+
+        // Load today's attendance
+        function loadTodayAttendance() {
+            const today = new Date().toISOString().split('T')[0];
+            const attendanceKey = `attendance_${currentUser.nip}_${today}`;
+            todayAttendance = JSON.parse(localStorage.getItem(attendanceKey));
+            
+            updateAttendanceStatus();
+        }
+
+        // Update attendance status display
+        function updateAttendanceStatus() {
+            const statusDiv = document.getElementById('statusKehadiran');
+            const checkinBtn = document.getElementById('checkinBtn');
+            const checkoutBtn = document.getElementById('checkoutBtn');
+            const checkinTime = document.getElementById('checkinTime');
+            const checkoutTime = document.getElementById('checkoutTime');
+            
+            if (!todayAttendance) {
+                // Belum absen
+                statusDiv.innerHTML = `
+                    <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <p class="text-gray-500">Belum melakukan absensi hari ini</p>
+                `;
+                checkinBtn.disabled = false;
+                checkinBtn.className = "w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition duration-200 font-medium pulse-animation";
+                checkoutBtn.disabled = true;
+                checkoutBtn.className = "w-full bg-gray-400 text-white py-3 rounded-lg transition duration-200 font-medium cursor-not-allowed";
+            } else if (todayAttendance.checkin && !todayAttendance.checkout) {
+                // Sudah check in, belum check out
+                statusDiv.innerHTML = `
+                    <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <p class="text-green-600 font-medium">Sudah Check In</p>
+                    <p class="text-sm text-gray-500">Waktu: ${todayAttendance.checkin}</p>
+                `;
+                checkinBtn.disabled = true;
+                checkinBtn.className = "w-full bg-gray-400 text-white py-3 rounded-lg transition duration-200 font-medium cursor-not-allowed";
+                checkinTime.textContent = `Check In: ${todayAttendance.checkin}`;
+                checkinTime.classList.remove('hidden');
+                
+                checkoutBtn.disabled = false;
+                checkoutBtn.className = "w-full bg-red-600 text-white py-3 rounded-lg hover:bg-red-700 transition duration-200 font-medium pulse-animation";
+            } else if (todayAttendance.checkin && todayAttendance.checkout) {
+                // Sudah lengkap
+                const duration = calculateWorkDuration(todayAttendance.checkin, todayAttendance.checkout);
+                statusDiv.innerHTML = `
+                    <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <p class="text-blue-600 font-medium">Absensi Lengkap</p>
+                    <div class="text-sm text-gray-600 mt-2">
+                        <p>Check In: ${todayAttendance.checkin}</p>
+                        <p>Check Out: ${todayAttendance.checkout}</p>
+                        <p>Durasi Kerja: ${duration}</p>
+                    </div>
+                `;
+                checkinBtn.disabled = true;
+                checkinBtn.className = "w-full bg-gray-400 text-white py-3 rounded-lg transition duration-200 font-medium cursor-not-allowed";
+                checkoutBtn.disabled = true;
+                checkoutBtn.className = "w-full bg-gray-400 text-white py-3 rounded-lg transition duration-200 font-medium cursor-not-allowed";
+                
+                checkinTime.textContent = `Check In: ${todayAttendance.checkin}`;
+                checkinTime.classList.remove('hidden');
+                checkoutTime.textContent = `Check Out: ${todayAttendance.checkout}`;
+                checkoutTime.classList.remove('hidden');
+            }
+        }
+
+        // Check In function
+        function checkIn() {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('id-ID', { 
+                hour12: false,
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            const today = new Date().toISOString().split('T')[0];
+            
+            todayAttendance = {
+                tanggal: today,
+                nip: currentUser.nip,
+                nama: currentUser.nama,
+                jabatan: currentUser.jabatan,
+                checkin: timeString,
+                checkout: null,
+                status: 'hadir',
+                timestamp: now.toLocaleString('id-ID'),
+                submittedBy: 'Self Service',
+                source: 'employee_portal'
+            };
+            
+            const attendanceKey = `attendance_${currentUser.nip}_${today}`;
+            localStorage.setItem(attendanceKey, JSON.stringify(todayAttendance));
+            
+            // Save to global attendance data with proper format
+            saveToGlobalAttendance();
+            
+            updateAttendanceStatus();
+            updateDebugInfo();
+            showModal('Check In Berhasil!', `Waktu check in Anda: ${timeString}\nData telah tersimpan ke sistem admin.`);
+        }
+
+        // Check Out function
+        function checkOut() {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('id-ID', { 
+                hour12: false,
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            const today = new Date().toISOString().split('T')[0];
+            
+            todayAttendance.checkout = timeString;
+            todayAttendance.timestamp = now.toLocaleString('id-ID');
+            
+            const attendanceKey = `attendance_${currentUser.nip}_${today}`;
+            localStorage.setItem(attendanceKey, JSON.stringify(todayAttendance));
+            
+            // Save to global attendance data
+            saveToGlobalAttendance();
+            
+            updateAttendanceStatus();
+            loadAttendanceHistory();
+            updateDebugInfo();
+            
+            const duration = calculateWorkDuration(todayAttendance.checkin, todayAttendance.checkout);
+            showModal('Check Out Berhasil!', `Waktu check out Anda: ${timeString}\nDurasi kerja: ${duration}\nData telah tersimpan ke sistem admin.`);
+        }
+
+        // Save to global attendance data (for admin access)
+        function saveToGlobalAttendance() {
+            let globalData = JSON.parse(localStorage.getItem('absenData')) || [];
+            
+            // Remove existing record for today from this user
+            globalData = globalData.filter(item => 
+                !(item.nip === todayAttendance.nip && item.tanggal === todayAttendance.tanggal)
+            );
+            
+            // Create properly formatted record for admin system
+            const adminRecord = {
+                tanggal: todayAttendance.tanggal,
+                nip: todayAttendance.nip,
+                nama: todayAttendance.nama,
+                jabatan: todayAttendance.jabatan,
+                status: todayAttendance.status,
+                checkin: todayAttendance.checkin,
+                checkout: todayAttendance.checkout,
+                timestamp: todayAttendance.timestamp,
+                submittedBy: 'Self Service',
+                source: 'employee_portal'
+            };
+            
+            // Add the new record
+            globalData.push(adminRecord);
+            
+            // Save back to localStorage
+            localStorage.setItem('absenData', JSON.stringify(globalData));
+            
+            // Update integration status
+            document.getElementById('integrationStatus').textContent = 'Data berhasil disinkronkan dengan sistem admin';
+            
+            console.log('Data saved to admin system:', adminRecord);
+            console.log('Total records in admin system:', globalData.length);
+        }
+
+        // Calculate work duration
+        function calculateWorkDuration(checkin, checkout) {
+            const [checkinHour, checkinMin] = checkin.split(':').map(Number);
+            const [checkoutHour, checkoutMin] = checkout.split(':').map(Number);
+            
+            const checkinMinutes = checkinHour * 60 + checkinMin;
+            const checkoutMinutes = checkoutHour * 60 + checkoutMin;
+            
+            const durationMinutes = checkoutMinutes - checkinMinutes;
+            const hours = Math.floor(durationMinutes / 60);
+            const minutes = durationMinutes % 60;
+            
+            return `${hours} jam ${minutes} menit`;
+        }
+
+        // Load attendance history
+        function loadAttendanceHistory() {
+            const tbody = document.getElementById('riwayatTable');
+            tbody.innerHTML = '';
+            
+            const history = [];
+            
+            // Get last 7 days
+            for (let i = 0; i < 7; i++) {
+                const date = new Date();
+                date.setDate(date.getDate() - i);
+                const dateString = date.toISOString().split('T')[0];
+                
+                const attendanceKey = `attendance_${currentUser.nip}_${dateString}`;
+                const dayAttendance = JSON.parse(localStorage.getItem(attendanceKey));
+                
+                if (dayAttendance) {
+                    history.push(dayAttendance);
+                } else {
+                    history.push({
+                        tanggal: dateString,
+                        status: 'tidak hadir',
+                        checkin: '-',
+                        checkout: '-'
+                    });
+                }
+            }
+            
+            history.forEach(record => {
+                const row = document.createElement('tr');
+                const duration = record.checkin && record.checkout ? 
+                    calculateWorkDuration(record.checkin, record.checkout) : '-';
+                
+                row.innerHTML = `
+                    <td class="border border-gray-300 px-4 py-2">${new Date(record.tanggal).toLocaleDateString('id-ID')}</td>
+                    <td class="border border-gray-300 px-4 py-2">
+                        <span class="px-2 py-1 rounded text-white text-xs ${record.status === 'hadir' ? 'status-hadir' : 'bg-gray-400'}">${record.status.toUpperCase()}</span>
+                    </td>
+                    <td class="border border-gray-300 px-4 py-2">${record.checkin || '-'}</td>
+                    <td class="border border-gray-300 px-4 py-2">${record.checkout || '-'}</td>
+                    <td class="border border-gray-300 px-4 py-2">${duration}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        // Modal functions
+        function showModal(title, message) {
+            document.getElementById('modalTitle').textContent = title;
+            document.getElementById('modalMessage').textContent = message;
+            document.getElementById('successModal').classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('successModal').classList.add('hidden');
+        }
+
+        // Admin panel functions
+        function showAdminPanel() {
+            document.getElementById('loginPage').classList.add('hidden');
+            document.getElementById('mainApp').classList.add('hidden');
+            document.getElementById('adminPanel').classList.remove('hidden');
+        }
+
+        function backToEmployee() {
+            document.getElementById('adminPanel').classList.add('hidden');
+            document.getElementById('loginPage').classList.remove('hidden');
+        }
+
+        // Admin login
+        document.getElementById('adminLoginForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const username = document.getElementById('adminUsername').value;
+            const password = document.getElementById('adminPassword').value;
+            
+            if (username === 'admin' && password === 'user') {
+                document.getElementById('adminLoginPage').classList.add('hidden');
+                document.getElementById('adminDashboard').classList.remove('hidden');
+                loadAdminDashboard();
+                setInterval(loadAdminDashboard, 5000); // Auto refresh every 5 seconds
+            } else {
+                document.getElementById('adminLoginError').classList.remove('hidden');
+            }
+        });
+
+        function logoutAdmin() {
+            document.getElementById('adminDashboard').classList.add('hidden');
+            document.getElementById('adminLoginPage').classList.remove('hidden');
+            document.getElementById('adminUsername').value = 'admin';
+            document.getElementById('adminPassword').value = 'user';
+            document.getElementById('adminLoginError').classList.add('hidden');
+        }
+
+        function showAdminPage(page) {
+            // Hide all content pages
+            document.getElementById('adminDashboardContent').classList.add('hidden');
+            document.getElementById('adminRekapContent').classList.add('hidden');
+            
+            // Reset nav buttons
+            document.getElementById('navAdminDashboard').className = "py-4 px-6 border-b-2 border-transparent hover:border-white transition duration-200";
+            document.getElementById('navAdminRekap').className = "py-4 px-6 border-b-2 border-transparent hover:border-white transition duration-200";
+            
+            if (page === 'dashboard') {
+                document.getElementById('adminDashboardContent').classList.remove('hidden');
+                document.getElementById('navAdminDashboard').className = "py-4 px-6 border-b-2 border-white transition duration-200";
+                loadAdminDashboard();
+            } else if (page === 'rekap') {
+                document.getElementById('adminRekapContent').classList.remove('hidden');
+                document.getElementById('navAdminRekap').className = "py-4 px-6 border-b-2 border-white transition duration-200";
+                loadAdminRekap();
+            }
+        }
+
+        function loadAdminDashboard() {
+            const absenData = JSON.parse(localStorage.getItem('absenData')) || [];
+            const today = new Date().toISOString().split('T')[0];
+            const todayData = absenData.filter(item => item.tanggal === today);
+            const hadirCount = todayData.filter(item => item.status === 'hadir').length;
+            const selfServiceCount = todayData.filter(item => item.submittedBy === 'Self Service').length;
+            
+            document.getElementById('adminHadirCount').textContent = hadirCount;
+            document.getElementById('adminSelfServiceCount').textContent = selfServiceCount;
+            
+            loadAdminTodayTable();
+        }
+
+        function loadAdminTodayTable() {
+            const absenData = JSON.parse(localStorage.getItem('absenData')) || [];
+            const today = new Date().toISOString().split('T')[0];
+            const todayData = absenData.filter(item => item.tanggal === today);
+            const tbody = document.getElementById('adminTodayTable');
+            tbody.innerHTML = '';
+            
+            if (todayData.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="border border-gray-300 px-4 py-8 text-center text-gray-500">Belum ada data absen hari ini</td></tr>';
+                return;
+            }
+            
+            todayData.forEach(record => {
+                const row = document.createElement('tr');
+                const isSelService = record.submittedBy === 'Self Service';
+                const sourceClass = isSelService ? 'bg-green-500' : 'bg-blue-500';
+                const sourceText = isSelService ? 'Self Service' : 'Admin Input';
+                
+                row.innerHTML = `
+                    <td class="border border-gray-300 px-4 py-2">${record.nip}</td>
+                    <td class="border border-gray-300 px-4 py-2">${record.nama}</td>
+                    <td class="border border-gray-300 px-4 py-2">
+                        <span class="px-2 py-1 rounded text-white text-xs status-${record.status}">${record.status.toUpperCase()}</span>
+                    </td>
+                    <td class="border border-gray-300 px-4 py-2">${record.checkin || '-'}</td>
+                    <td class="border border-gray-300 px-4 py-2">${record.checkout || '-'}</td>
+                    <td class="border border-gray-300 px-4 py-2">
+                        <span class="px-2 py-1 ${sourceClass} text-white text-xs rounded">${sourceText}</span>
+                    </td>
+                    <td class="border border-gray-300 px-4 py-2 text-sm">${record.timestamp || '-'}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        function loadAdminRekap() {
+            const absenData = JSON.parse(localStorage.getItem('absenData')) || [];
+            const tbody = document.getElementById('adminRekapTable');
+            tbody.innerHTML = '';
+            
+            if (absenData.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="border border-gray-300 px-4 py-8 text-center text-gray-500">Belum ada data absen</td></tr>';
+                return;
+            }
+            
+            const sortedData = [...absenData].sort((a, b) => new Date(b.tanggal) - new Date(a.tanggal));
+            
+            sortedData.forEach(record => {
+                const row = document.createElement('tr');
+                const isSelService = record.submittedBy === 'Self Service';
+                const sourceClass = isSelService ? 'bg-green-500' : 'bg-blue-500';
+                const sourceText = isSelService ? 'Self Service' : 'Admin Input';
+                
+                row.innerHTML = `
+                    <td class="border border-gray-300 px-4 py-2">${record.tanggal}</td>
+                    <td class="border border-gray-300 px-4 py-2">${record.nip}</td>
+                    <td class="border border-gray-300 px-4 py-2">${record.nama}</td>
+                    <td class="border border-gray-300 px-4 py-2">${record.jabatan}</td>
+                    <td class="border border-gray-300 px-4 py-2">
+                        <span class="px-2 py-1 rounded text-white text-xs status-${record.status}">${record.status.toUpperCase()}</span>
+                    </td>
+                    <td class="border border-gray-300 px-4 py-2">${record.checkin || '-'}</td>
+                    <td class="border border-gray-300 px-4 py-2">${record.checkout || '-'}</td>
+                    <td class="border border-gray-300 px-4 py-2">
+                        <span class="px-2 py-1 ${sourceClass} text-white text-xs rounded">${sourceText}</span>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        function cetakPDF() {
+            const absenData = JSON.parse(localStorage.getItem('absenData')) || [];
+            
+            if (absenData.length === 0) {
+                showModal('Tidak Ada Data!', 'Belum ada data absensi untuk dicetak. Silakan lakukan absensi terlebih dahulu.');
+                return;
+            }
+            
+            // Create HTML content for PDF-like format
+            let htmlContent = `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="UTF-8">
+                    <title>Rekap Kehadiran - PN Jantho</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; margin: 20px; }
+                        .header { text-align: center; margin-bottom: 30px; }
+                        .header h1 { margin: 0; font-size: 18px; }
+                        .header h2 { margin: 5px 0; font-size: 16px; }
+                        .info { margin-bottom: 20px; }
+                        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                        th, td { border: 1px solid #000; padding: 8px; text-align: left; font-size: 12px; }
+                        th { background-color: #f0f0f0; font-weight: bold; }
+                        .status-hadir { background-color: #10b981; color: white; padding: 2px 6px; border-radius: 3px; }
+                        .status-izin { background-color: #f59e0b; color: white; padding: 2px 6px; border-radius: 3px; }
+                        .status-alpa { background-color: #ef4444; color: white; padding: 2px 6px; border-radius: 3px; }
+                        .footer { margin-top: 30px; text-align: right; }
+                    </style>
+                </head>
+                <body>
+                    <div class="header">
+                        <h1>REKAP KEHADIRAN PETUGAS POSBAKUM</h1>
+                        <h2>PENGADILAN NEGERI JANTHO</h2>
+                    </div>
+                    
+                    <div class="info">
+                        <p><strong>Tanggal Cetak:</strong> ${new Date().toLocaleDateString('id-ID', { 
+                            weekday: 'long', 
+                            year: 'numeric', 
+                            month: 'long', 
+                            day: 'numeric' 
+                        })}</p>
+                        <p><strong>Total Data:</strong> ${absenData.length} record</p>
+                    </div>
+                    
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>No</th>
+                                <th>Tanggal</th>
+                                <th>NIP</th>
+                                <th>Nama</th>
+                                <th>Jabatan</th>
+                                <th>Status</th>
+                                <th>Check In</th>
+                                <th>Check Out</th>
+                                <th>Sumber Data</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+            
+            // Sort data by date (newest first)
+            const sortedData = [...absenData].sort((a, b) => new Date(b.tanggal) - new Date(a.tanggal));
+            
+            sortedData.forEach((record, index) => {
+                const tanggalFormatted = new Date(record.tanggal).toLocaleDateString('id-ID');
+                const statusClass = `status-${record.status}`;
+                const sumberData = record.submittedBy === 'Self Service' ? 'Self Service' : 'Admin Input';
+                
+                htmlContent += `
+                    <tr>
+                        <td>${index + 1}</td>
+                        <td>${tanggalFormatted}</td>
+                        <td>${record.nip}</td>
+                        <td>${record.nama}</td>
+                        <td>${record.jabatan}</td>
+                        <td><span class="${statusClass}">${record.status.toUpperCase()}</span></td>
+                        <td>${record.checkin || '-'}</td>
+                        <td>${record.checkout || '-'}</td>
+                        <td>${sumberData}</td>
+                    </tr>
+                `;
+            });
+            
+            htmlContent += `
+                        </tbody>
+                    </table>
+                    
+                    <div class="footer">
+                        <p>Dicetak pada: ${new Date().toLocaleString('id-ID')}</p>
+                        <p><em>Sistem Presensi Petugas Posbakum - Pengadilan Negeri Jantho</em></p>
+                    </div>
+                </body>
+                </html>
+            `;
+            
+            // Create blob and download
+            try {
+                const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                
+                // Create download link
+                const downloadLink = document.createElement('a');
+                downloadLink.href = url;
+                downloadLink.download = `Rekap-Kehadiran-PN-Jantho-${new Date().toISOString().split('T')[0]}.html`;
+                downloadLink.style.display = 'none';
+                
+                // Add to DOM, click, and remove
+                document.body.appendChild(downloadLink);
+                downloadLink.click();
+                document.body.removeChild(downloadLink);
+                
+                // Clean up
+                setTimeout(() => {
+                    URL.revokeObjectURL(url);
+                }, 1000);
+                
+                showModal('Download Berhasil!', `File rekap kehadiran berhasil didownload!\n\nFile: Rekap-Kehadiran-PN-Jantho-${new Date().toISOString().split('T')[0]}.html\n\nAnda dapat membuka file tersebut di browser dan mencetak ke PDF jika diperlukan.`);
+                
+            } catch (error) {
+                console.error('Download error:', error);
+                showModal('Download Gagal!', 'Terjadi kesalahan saat mendownload file. Silakan coba lagi atau hubungi administrator.');
+            }
+        }
+    </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9957d1fc1478b5eb',t:'MTc2MTYyNzExMC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
